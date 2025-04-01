@@ -83,7 +83,7 @@ def circular_slice(arr, i, size):
     return np.concatenate((arr, arr))[i:i+size]
 
 def testText(num:int):
-    print(f"||{"-"*4} Test {num} {"-"*4}||")
+    print(f"||{'-'*4} Test {num} {'-'*4}||")
 
 def normaliceArr(arr):
     maxi = sum(arr)
