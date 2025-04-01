@@ -310,7 +310,7 @@ def crossover(survivors):
 
 
 def geneticAlgorithm():
-    print(f"||{"-"*10} INICIO ALGORITMO GENÉTICO {"-"*10}||")
+    print(f"||{'-'*10} INICIO ALGORITMO GENÉTICO {'-'*10}||")
 
     # Inicializamos la población
     population = randomPopulation(POPULATION_SIZE, NUM_AGENTS)
