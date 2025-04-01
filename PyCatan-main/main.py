@@ -44,7 +44,7 @@ MAX_VARIATION = 0.25
 CROSSOVER_ORDER_TYPE = crossoverTypes.FIRST_TO_LAST
 
 ''' 
-||---- Función fitness ----||
+||---- Funcion fitness ----||
     Opciones:
     -- Número de partidas a jugar
     -- Orden de juego en las paridas:
@@ -53,7 +53,7 @@ CROSSOVER_ORDER_TYPE = crossoverTypes.FIRST_TO_LAST
         --- Siempre último
     -- Posición en la que se finaliza:
         --- Posición 1ª (ACTUAL)
-        --- Puntuación escalable por posición
+        --- Puntuación escalable por posicion
         --- Posición 2ª
     -- Adversarios:
         --- Siempre los mismos
@@ -75,7 +75,7 @@ class Genome:
         return f"|| GENOME || \n --prob: {self.prob} \n"
     
     def __repr__(self):
-        # Este método define la representación que se usa al imprimir una lista de objetos
+        # Este metodo define la representacion que se usa al imprimir una lista de objetos
         return f"Genome({self.prob})"
 
 def circular_slice(arr, i, size):
@@ -86,7 +86,7 @@ def testText(num:int):
 
 def normaliceArr(arr):
     maxi = sum(arr)
-    if maxi == 0:  # Evitar división por cero
+    if maxi == 0:  # Evitar division por cero
         return arr
     return [x / maxi for x in arr]  # Normalizar cada elemento
 
@@ -222,7 +222,7 @@ def fitnessFST(population):
             player_tag = AGENTS[i]
             #print(player_tag)
             for j in range(NUM_PLAYS): # Inicio partidas
-                ''' 1.Selección de contrincantes '''
+                ''' 1.Seleccion de contrincantes '''
                 oponents = []
                 if(OPONENT_SELECTION_TYPE == oponentSelection.SECUENTIAL):
                     oponents = circular_slice(indiv.prob, i+1, 3)
@@ -232,13 +232,13 @@ def fitnessFST(population):
                 users = [player] + (list)(oponents)
                 #print(users_tag)
                 
-                ''' 2.Ejecución de la partida y extracción del ganador'''
+                ''' 2.Ejecucion de la partida y extraccion del ganador'''
                 try:
-                    # Inicialización de partida:
+                    # Inicializacion de partida:
                     gameDirector = GameDirector(agents=users_tag, max_rounds=60, store_trace=False)
                     game_trace = gameDirector.game_start(print_outcome=False)
 
-                    # Recuperación del ganador:
+                    # Recuperacion del ganador:
                     last_round = max(game_trace["game"].keys(), key=lambda r: int(r.split("_")[-1]))
                     last_turn = max(game_trace["game"][last_round].keys(), key=lambda t: int(t.split("_")[-1].lstrip("P")))
                     victory_points = game_trace["game"][last_round][last_turn]["end_turn"]["victory_points"]
@@ -251,7 +251,7 @@ def fitnessFST(population):
 
                     # print(users_tag[int(winner.lstrip("J"))] == player_tag)
 
-                    ''' 3.Comprobación de ganador y asignación de puntos '''
+                    ''' 3.Comprobacion de ganador y asignacion de puntos '''
                     if(SCORE_PUNTUATION_TYPE == scorePuntuation.FIRST_ONLY):
                         if(users_tag[int(winner.lstrip("J"))] == player_tag):
                             acc_score += 1
@@ -266,7 +266,7 @@ def fitnessFST(population):
 
         dif_l = np.array(indiv.prob) - np.array(acc_indiv_scores)
         difn_l = np.abs(dif_l)
-        score_indiv = sum(difn_l) * 100 # Escalada del fitness para mayor diferenciación
+        score_indiv = sum(difn_l) * 100 # Escalada del fitness para mayor diferenciacion
 
         if(score_indiv < min_fitness):
             min_fitness = score_indiv
@@ -311,21 +311,21 @@ def crossover(survivors):
 def geneticAlgorithm():
     print(f"||{"-"*10} INICIO ALGORITMO GENÉTICO {"-"*10}||")
 
-    # Inicializamos la población
+    # Inicializamos la poblacion
     population = randomPopulation(POPULATION_SIZE, NUM_AGENTS)
 
     actual_min_fitness = float("inf")
     stop_signals = 10
 
-    # Algoritmo genético
+    # Algoritmo genetico
     for i in range(1, ITERATIONS + 1):
         print(f"----> Iteration: {i} <----")
-        # 1. Cálculo del fitness -> lista de tuplas [((individuo),score),....]
-        fitness, min_fitness = fitnessF(population) # Se podría poner fitness y max_fitness_value
+        # 1. Calculo del fitness -> lista de tuplas [((individuo),score),....]
+        fitness, min_fitness = fitnessF(population) # Se podria poner fitness y max_fitness_value
         survivors = selectSurvivors(fitness)
         population = crossover(survivors)
 
-        # Condición de parada aquí
+        # Condicion de parada aqui
         if(min_fitness > actual_min_fitness):
             stop_signals -= 1
             if(stop_signals == 0):
@@ -350,7 +350,7 @@ def testFunctions():
     initial2 = randomIndividual(NUM_AGENTS)
     print(f"Init: {initial}\nInit2: {initial2}\nCossover:{reproduce(initial,initial2)}\n")
 
-    # Test de mutación
+    # Test de mutacion
     testText(3)
     print(f"Initial: {initial}\nMutation: {mutate(initial)}\nSuma de probabilidades de la mutación: {sum(mutate(initial).prob)}")
 
