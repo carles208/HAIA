@@ -33,16 +33,15 @@ class scorePuntuation(Enum):
     FIRST_SECOND = 2
     SCALATED = 3
 
-POPULATION_SIZE = 4
+POPULATION_SIZE = 20
 NUM_AGENTS = 10
-ITERATIONS = 10
-MUTATE_PER = 0
+ITERATIONS = 50
+MUTATE_PER = 0.1
 DISCARD_RATIO = 0.5
 REPRODUCTIVE_RATE = 2
 MUTATE_TYPE = mutationTypes.VARIATION
 MAX_VARIATION = 0.25
 CROSSOVER_ORDER_TYPE = crossoverTypes.FIRST_TO_LAST
-
 
 ''' 
 ||---- Función fitness ----||
@@ -91,13 +90,13 @@ def normaliceArr(arr):
         return arr
     return [x / maxi for x in arr]  # Normalizar cada elemento
 
+def randomPopulation(numPopulation, numAgents):
+    return  np.array([randomIndividual(numAgents) for _ in range(numPopulation)])
+
 def randomIndividual(numAgents:int):
     indiv = random.rand(numAgents)
     indiv = normaliceArr(indiv)
     return Genome(indiv)
-
-def randomPopulation(numPopulation, numAgents):
-    return  np.array([randomIndividual(numAgents) for _ in range(numPopulation)])
 
 def mutate(son):
     mutation = None
@@ -144,7 +143,71 @@ def reproduce(genome1, genome2, number_to_reproduce):
         sons.append(son)
     return sons
 
-def fitnessF(population):
+from concurrent.futures import ThreadPoolExecutor
+import threading
+
+# Reescribiendo la función fitnessF con multithreading
+def fitnessF(population, num_threads=4):
+    print(population)
+    print(len(population))
+    start = time.time()
+
+    fitness_lock = threading.Lock()
+    fitness = []
+    min_fitness = float('inf')
+
+    def compute_fitness_for_indiv(indiv):
+        acc_indiv_scores = []
+        for i in range(NUM_AGENTS):
+            acc_score = 0.0
+            player = indiv.prob[i]
+            player_tag = AGENTS[i]
+
+            for j in range(NUM_PLAYS):  # Inicio partidas
+                oponents = circular_slice(indiv.prob, i+1, 3)
+                oponents_tag = circular_slice(AGENTS, i+1, 3)
+
+                users_tag = [player_tag] + list(oponents_tag)
+                users = [player] + list(oponents)
+
+                try:
+                    gameDirector = GameDirector(agents=users_tag, max_rounds=60, store_trace=False)
+                    game_trace = gameDirector.game_start(print_outcome=False)
+
+                    last_round = max(game_trace["game"].keys(), key=lambda r: int(r.split("_")[-1]))
+                    last_turn = max(game_trace["game"][last_round].keys(), key=lambda t: int(t.split("_")[-1].lstrip("P")))
+                    victory_points = game_trace["game"][last_round][last_turn]["end_turn"]["victory_points"]
+                    winner = max(victory_points, key=lambda player: int(victory_points[player]))
+
+                    if SCORE_PUNTUATION_TYPE == scorePuntuation.FIRST_ONLY:
+                        if users_tag[int(winner.lstrip("J"))] == player_tag:
+                            acc_score += 1
+
+                except Exception as e:
+                    print(f"Error: {e}")
+
+            acc_indiv_scores += [acc_score]
+
+        acc_indiv_scores = normaliceArr(acc_indiv_scores)
+
+        dif_l = np.array(indiv.prob) - np.array(acc_indiv_scores)
+        difn_l = np.abs(dif_l)
+        score_indiv = sum(difn_l) * 100
+
+        nonlocal min_fitness
+        with fitness_lock:
+            if score_indiv < min_fitness:
+                min_fitness = score_indiv
+            fitness.append((indiv, score_indiv))
+
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        executor.map(compute_fitness_for_indiv, population)
+
+    print(time.time()-start)
+    return fitness, min_fitness
+
+# Fitness sin threading
+def fitnessFST(population):
     print(population)
     print(len(population))
     start = time.time()
@@ -199,26 +262,18 @@ def fitnessF(population):
             acc_indiv_scores += [acc_score]
 
         ''' Devolver fitness como la normal de la diferencia de probabilidades junto a su array individuo correspondiente '''
-        #print(acc_indiv_scores)
         acc_indiv_scores = normaliceArr(acc_indiv_scores)
-        # print(acc_indiv_scores)
-        # print(sum(acc_indiv_scores))
 
         dif_l = np.array(indiv.prob) - np.array(acc_indiv_scores)
-        #print(dif_l)
         difn_l = np.abs(dif_l)
-        #print(difn_l)
         score_indiv = sum(difn_l) * 100 # Escalada del fitness para mayor diferenciación
-        #print(score_indiv)
 
         if(score_indiv < min_fitness):
             min_fitness = score_indiv
 
         fitness_indiv = (indiv,score_indiv)
-        #print(fitness_indiv)
 
         fitness.append(fitness_indiv)
-        #print(fitness)
     print(time.time()-start)
     return fitness, min_fitness
 
@@ -230,27 +285,28 @@ def selectSurvivors(population):
     return (list)(survivors)
 
 def crossover(survivors):
-    # Elements to reproduce
-    cross_num = (int) ((1 - DISCARD_RATIO) * POPULATION_SIZE)
-    new_population = survivors
+    cross_num = int((1 - DISCARD_RATIO) * POPULATION_SIZE)
+    new_population = survivors.copy()
+    sons_created = 0
 
-    ''' TIPOS DE ORDEN DE REPRODUCCIÓN '''
-    if(CROSSOVER_ORDER_TYPE == crossoverTypes.FIRST_TO_LAST):
-        left = cross_num
-        for i in range(len(survivors) // 2):
+    if CROSSOVER_ORDER_TYPE == crossoverTypes.FIRST_TO_LAST:
+        pairs = len(survivors) // 2
+        for i in range(pairs):
+            if sons_created >= cross_num:
+                break  # Parar si ya tienes los hijos necesarios
+
             parent1 = survivors[i]
-            parent2 = survivors[len(survivors) - 1 - i]
-            if(left >= REPRODUCTIVE_RATE):
-                sons = reproduce(parent1, parent2, REPRODUCTIVE_RATE)
-                cross_num -= REPRODUCTIVE_RATE
-                new_population += sons
-            else:
-                sons = reproduce(parent1, parent2, left)
-                cross_num -= left
-                new_population += sons
-            left = cross_num - REPRODUCTIVE_RATE
-   
+            parent2 = survivors[-(i + 1)]
+
+            remaining_sons = cross_num - sons_created
+            sons_to_create = min(REPRODUCTIVE_RATE, remaining_sons)
+
+            sons = reproduce(parent1, parent2, sons_to_create)
+            new_population += sons
+            sons_created += sons_to_create
+
     return new_population
+
 
 def geneticAlgorithm():
     print(f"||{"-"*10} INICIO ALGORITMO GENÉTICO {"-"*10}||")
@@ -259,7 +315,7 @@ def geneticAlgorithm():
     population = randomPopulation(POPULATION_SIZE, NUM_AGENTS)
 
     actual_min_fitness = float("inf")
-    stop_signals = 5
+    stop_signals = 10
 
     # Algoritmo genético
     for i in range(1, ITERATIONS + 1):
@@ -276,10 +332,11 @@ def geneticAlgorithm():
                 print(f"Condición de parada activada con fitness mínimo de {actual_min_fitness}")
                 exit(0)
         else:
-            stop_signals = 5
+            stop_signals = 10
             actual_min_fitness = min_fitness
-        
-        print(f"Actual min fitness: {actual_min_fitness}")
+
+        best_indiv, best_fitness = min(fitness, key=lambda x: x[1])
+        print("Mejor individuo:", best_indiv, "con fitness:", actual_min_fitness)
 
 def testFunctions():
     #Test de population
